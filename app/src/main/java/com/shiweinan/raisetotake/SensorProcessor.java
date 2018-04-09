@@ -55,6 +55,8 @@ public class SensorProcessor implements SensorEventListener {
                            Math.toDegrees(values[2]) + "," +
                            Math.toDegrees(values[0]));*/
         double x = Math.toDegrees(values[1]);
+        double y = Math.toDegrees(values[2]);
+        double z = Math.toDegrees(values[0]);
 
         if (data.size() > 0) { //save data at least every 10ms
             long lastTime = data.get(data.size() - 1).timeStamp;
@@ -65,6 +67,8 @@ public class SensorProcessor implements SensorEventListener {
         SensorData d = new SensorData();
         d.timeStamp = timestamp;
         d.xOrientation = x;
+        d.yOrientation = y;
+        d.zOrientation = z;
         data.add(d);
         while (data.size()> 0 && (timestamp - data.get(0).timeStamp) > 2000000000) { // reserve most recent 2s data
             data.remove(0);
