@@ -71,10 +71,6 @@ public class MainActivity extends AppCompatActivity {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
     }
     public void prepareCamera() {
-        /*Camera.Parameters parameters = camera.getParameters();
-        parameters.setPreviewSize(preview.getWidth(), preview.getHeight());
-        preview.requestLayout();
-        camera.setParameters(parameters);*/
         camera.startPreview();
     }
 
@@ -131,6 +127,9 @@ public class MainActivity extends AppCompatActivity {
         return c;
     }
     public void takePhoto(View view) {
+        takePhoto();
+    }
+    public void takePhoto() {
         Camera.PictureCallback picture = new Camera.PictureCallback() {
             public File pictureFile;
             @Override
