@@ -5,6 +5,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 
+import java.nio.DoubleBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -16,6 +17,7 @@ public class SensorProcessor implements SensorEventListener {
     float[] accelerometerValues = new float[3];
     float[] magneticValues = new float[3];
     float[] gyroscopeValues = new float[3];
+    double lastShootTime = 0;
     private MainActivity mainActivity;
     private List<SensorData> data = new LinkedList<>();
 
@@ -70,6 +72,12 @@ public class SensorProcessor implements SensorEventListener {
         d.xOrientation = x;
         d.yOrientation = y;
         d.zOrientation = z;
+        d.xAcc = accelerometerValues[0];
+        d.yAcc = accelerometerValues[1];
+        d.zAcc = accelerometerValues[2];
+        d.xDirection = R[2];
+        d.yDirection = R[5];
+        d.zDirection = R[8];
         data.add(d);
         while (data.size()> 0 && (timestamp - data.get(0).timeStamp) > 500000000) { // reserve most recent 0.5s data
             data.remove(0);
@@ -81,20 +89,27 @@ public class SensorProcessor implements SensorEventListener {
             return RaiseStatus.Fail;
         }
 
-        SensorData currOri = data.get(data.size() - 1);
+        SensorData curr = data.get(data.size() - 1);
 
-        // Get speed on unit sphere within 200 ms
+        // Get speed on unit sphere within 400 ms
         ArrayList<Double> speedLists = new ArrayList<>();
+        ArrayList<Double> accLists = new ArrayList<>();
         for (int i = 0; i + 1 < data.size(); i++) {
             SensorData ori0 = data.get(i);
             SensorData ori1 = data.get(i + 1);
-            if ((currOri.timeStamp - ori0.timeStamp) / 1e9 < 0.2) {
+            if ((curr.timeStamp - ori0.timeStamp) / 1e9 < 0.4) {
                 double escapeTime = (ori1.timeStamp - ori0.timeStamp) / 1e9;
-                double dX = (Math.cos(Math.toRadians(ori1.xOrientation))  - Math.cos(Math.toRadians(ori0.xOrientation))) / escapeTime;
-                double dY = (Math.cos(Math.toRadians(ori1.yOrientation))  - Math.cos(Math.toRadians(ori0.yOrientation))) / escapeTime;
-                double dZ = (Math.cos(Math.toRadians(ori1.zOrientation))  - Math.cos(Math.toRadians(ori0.zOrientation))) / escapeTime;
+                double dX = (ori1.xDirection - ori0.xDirection) / escapeTime;
+                double dY = (ori1.yDirection - ori0.yDirection) / escapeTime;
+                double dZ = (ori1.zDirection - ori0.zDirection) / escapeTime;
                 double speed = Math.sqrt(dX * dX + dY * dY + dZ * dZ);
                 speedLists.add(speed);
+
+                double aX = ori1.xAcc - ori0.xAcc;
+                double aY = ori1.yAcc - ori0.yAcc;
+                double aZ = ori1.zAcc - ori0.zAcc;
+                double acc = Math.sqrt(aX * aX + aY * aY + aZ * aZ);
+                accLists.add(acc);
             }
         }
 
@@ -104,6 +119,10 @@ public class SensorProcessor implements SensorEventListener {
             Collections.sort(sortList);
             double mid = sortList.get(sortList.size() / 2);
             speedLists.set(i, mid);
+            sortList = new ArrayList<Double>(accLists.subList(i - 4, i + 1));
+            Collections.sort(sortList);
+            mid = sortList.get(sortList.size() / 2);
+            accLists.set(i, mid);
         }
         // Mean-num Filtering (window = 5)
         for (int i = speedLists.size() - 1; i >= 8; i--) {
@@ -112,31 +131,58 @@ public class SensorProcessor implements SensorEventListener {
                 sum += speedLists.get(i - j);
             }
             speedLists.set(i, sum / 5);
+            sum = 0;
+            for (int j = 0; j < 5; j++) {
+                sum += accLists.get(i - j);
+            }
+            accLists.set(i, sum / 5);
         }
         speedLists = new ArrayList<Double>(speedLists.subList(8, speedLists.size()));
+        accLists = new ArrayList<Double>(accLists.subList(8, accLists.size()));
 
         // Calculate the 20% & 80% minimum speed
         double lastSpeed = speedLists.get(speedLists.size() - 1);
+        double lastAcc = accLists.get(accLists.size() - 1);
         Collections.sort(speedLists);
         double minSpeed50 = speedLists.get((int)(speedLists.size() * 0.5));
         double minSpeed90 = speedLists.get((int)(speedLists.size() * 0.9));
+        Collections.sort(accLists);
+        double minAcc50 = accLists.get((int)(speedLists.size() * 0.5));
+        double minAcc90 = accLists.get((int)(speedLists.size() * 0.9));
 
         boolean check = true;
-        if (!(-15 <= currOri.xOrientation && currOri.xOrientation <= 15)) {
+        if (!(-15 <= curr.xOrientation && curr.xOrientation <= 15)) {
             check = false;
         }
-        if (!((45 <= currOri.yOrientation && currOri.yOrientation <= 135) || (-135 <= currOri.yOrientation && currOri.yOrientation <= -45))) {
+        if (!((45 <= curr.yOrientation && curr.yOrientation <= 135) || (-135 <= curr.yOrientation && curr.yOrientation <= -45))) {
             check = false;
         }
 
-        String output = "";
-        if (check && minSpeed50 >= 2 && minSpeed90 >= 4 && lastSpeed <= 2) {
-            //output = "x= " + (int)currOri.xOrientation + "\ny= " + (int)currOri.yOrientation + "\nSpeed50= " + minSpeed50 + "\nSpeed90= " + minSpeed90 + "\nLastSpeed= " + lastSpeed;
-            output = "Shoot!";
+        double shootInterval = (curr.timeStamp - lastShootTime) / 1e9;
+        if (shootInterval >= 1) {
+            mainActivity.showText("");
         }
-
-        System.out.println(output);
-        mainActivity.showText(output);
+        if (check && minSpeed50 >= 3 && minSpeed90 >= 10 && lastSpeed <= 2 && minAcc90 >= 0.6) {
+            if (shootInterval >= 1) {
+                System.out.println("Shoot!");
+                mainActivity.showText("Shoot!");
+                mainActivity.takePhoto();
+                lastShootTime = curr.timeStamp;
+            }
+        } else {
+            int cnt = 0;
+            if (check) cnt++;
+            if (minSpeed50 >= 3) cnt++;
+            if (minSpeed90 >= 10) cnt++;
+            if (lastSpeed <= 2) cnt++;
+            if (minAcc90 >= 0.6) cnt++;
+            if (cnt == 4) {
+                if (minAcc50 < 3) System.out.println(1);
+                if (minSpeed90 < 10) System.out.println(2);
+                if (lastSpeed > 2) System.out.println(3 + ", " + lastSpeed);
+                if (minAcc90 < 0.6) System.out.println(4);
+            }
+        }
 
         return RaiseStatus.Fail;
     }
