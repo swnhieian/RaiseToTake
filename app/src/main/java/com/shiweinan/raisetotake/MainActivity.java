@@ -140,7 +140,14 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Error creating media file, check storage permissions: ");
                     return;
                 }
-                try {
+
+                {
+                    ImageView imageView = (ImageView) findViewById(R.id.imageView);
+                    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    imageView.setImageBitmap(bitmap);
+                }
+
+                /*try {
                     FileOutputStream fos = new FileOutputStream(pictureFile);
                     fos.write(bytes);
                     fos.close();
@@ -153,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "File not found: " + e.getMessage());
                 } catch (IOException e) {
                     Log.d(TAG, "Error accessing file: " + e.getMessage());
-                }
+                }*/
                 prepareCamera();
             }
         };

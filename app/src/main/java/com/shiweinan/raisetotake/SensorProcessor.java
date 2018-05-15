@@ -143,18 +143,42 @@ public class SensorProcessor implements SensorEventListener {
         // Calculate the 20% & 80% minimum speed
         double lastSpeed = speedLists.get(speedLists.size() - 1);
         double lastAcc = accLists.get(accLists.size() - 1);
+
+        /*String myLog = "Curr speed: " + lastSpeed + "\n";
+        myLog += "Speed - Time: ";
+        for (int i = 1; i <= 9; i++) {
+            myLog += speedLists.get((int)(speedLists.size() * 0.1 * i)) + ", ";
+        }
+        myLog += "\n";
+        myLog += "Acc - Time: ";
+        for (int i = 1; i <= 9; i++) {
+            myLog += accLists.get((int)(speedLists.size() * 0.1 * i)) + ", ";
+        }
+        myLog += "\n";*/
+
         Collections.sort(speedLists);
-        double minSpeed50 = speedLists.get((int)(speedLists.size() * 0.5));
-        double minSpeed90 = speedLists.get((int)(speedLists.size() * 0.9));
+        double minSpeed50 = speedLists.get((int)(speedLists.size() * 0.2));
+        double minSpeed90 = speedLists.get((int)(speedLists.size() * 0.8));
         Collections.sort(accLists);
         double minAcc50 = accLists.get((int)(speedLists.size() * 0.5));
         double minAcc90 = accLists.get((int)(speedLists.size() * 0.9));
+
+        /*myLog += "Speed - Sort: ";
+        for (int i = 1; i <= 9; i++) {
+            myLog += speedLists.get((int)(speedLists.size() * 0.1 * i)) + ", ";
+        }
+        myLog += "\n";
+        myLog += "Acc - Sort: ";
+        for (int i = 1; i <= 9; i++) {
+            myLog += accLists.get((int)(speedLists.size() * 0.1 * i)) + ", ";
+        }
+        myLog += "\n";*/
 
         boolean check = true;
         if (!(-15 <= curr.xOrientation && curr.xOrientation <= 15)) {
             check = false;
         }
-        if (!((45 <= curr.yOrientation && curr.yOrientation <= 135) || (-135 <= curr.yOrientation && curr.yOrientation <= -45))) {
+        if (!((60 <= curr.yOrientation && curr.yOrientation <= 120) || (-120 <= curr.yOrientation && curr.yOrientation <= -60))) {
             check = false;
         }
 
@@ -162,25 +186,12 @@ public class SensorProcessor implements SensorEventListener {
         if (shootInterval >= 1) {
             mainActivity.showText("");
         }
-        if (check && minSpeed50 >= 3 && minSpeed90 >= 10 && lastSpeed <= 2 && minAcc90 >= 0.6) {
+        if (check && minSpeed90 / minSpeed50 >= 3 && lastSpeed <= 3 && minAcc90 >= 0.5) {
             if (shootInterval >= 1) {
-                System.out.println("Shoot!");
+                //System.out.println(myLog);
                 mainActivity.showText("Shoot!");
                 mainActivity.takePhoto();
                 lastShootTime = curr.timeStamp;
-            }
-        } else {
-            int cnt = 0;
-            if (check) cnt++;
-            if (minSpeed50 >= 3) cnt++;
-            if (minSpeed90 >= 10) cnt++;
-            if (lastSpeed <= 2) cnt++;
-            if (minAcc90 >= 0.6) cnt++;
-            if (cnt == 4) {
-                if (minAcc50 < 3) System.out.println(1);
-                if (minSpeed90 < 10) System.out.println(2);
-                if (lastSpeed > 2) System.out.println(3 + ", " + lastSpeed);
-                if (minAcc90 < 0.6) System.out.println(4);
             }
         }
 
